@@ -3,6 +3,7 @@ global
   log 127.0.0.1 local1 notice
   user haproxy
   group haproxy
+  daemon
 
 defaults
   log global
@@ -10,32 +11,20 @@ defaults
   option httplog
   option dontlognull
   balance roundrobin
-  timeout connect 5000
-  timeout client 50000
-  timeout server 50000
+  timeout connect 5s
+  timeout client 1m
+  timeout server 1m
 
 listen stats
-  bind *:8001
+  bind *:1936
   option httpclose
   option forwardfor
   stats enable
-  stats uri /haproxy?stats
-  stats auth admin:123123q
+  stats uri /stats
+  stats auth stats:stats
   stats realm HAProxy\ Statistics
 
-frontend web-app
-  bind *:80
-  default_backend default
-
-
-backend default
-  balance roundrobin
-{{range $tag, $services := service "webapp" | byTag}}
- {{with $d := key "backend/current"}}
-  {{if $d}}
-   {{if eq $tag $d}}
-    {{range $services}} server {{.ID}} {{.Address}}:{{.Port}}
-   {{end}}
-  {{end}}
- {{end}}
-{{end}}{{end}}
+listen http-in
+    {{ $name := env "SERVICE_NAME" }}
+    bind *:80{{ range service $name}}
+    server {{.Name}}_{{.Node}} {{.Address}}:{{.Port}}{{end}}
